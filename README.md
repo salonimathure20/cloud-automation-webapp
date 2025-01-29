@@ -38,7 +38,7 @@ Before you begin, ensure you have the following tools installed:
 ## Running the Application
 
 1. Ensure the PostgreSQL container is running.
-2. Add the PostgreSQL connection variables to your `.env` file.
+2. Add the PostgreSQL connection variables to your `.env` file. Refer to the `.env.sample` file.
 3. Install dependencies:
    ```bash
    yarn install
