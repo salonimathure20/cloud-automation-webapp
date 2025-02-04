@@ -47,3 +47,14 @@ Before you begin, ensure you have the following tools installed:
    ```bash
    yarn start
    ```
+
+## Testing the Application
+
+1. Install dependencies:
+   ```bash
+   yarn install
+   ```
+2. Run the Test Suite:
+   ```bash
+   yarn test
+   ```
