@@ -50,6 +50,13 @@ describe("/healthz endpoint", () => {
 
     expect(res.status).toBe(400);
   });
+  it("should return 400 Bad Request when an unexpected query param is provided", async () => {
+    HealthCheck.create.mockResolvedValueOnce({});
+
+    const res = await request(app).get("/healthz?unexpectedParam=true");
+
+    expect(res.status).toBe(400);
+  });
 
   it("should return 503 when database insert fails", async () => {
     HealthCheck.create.mockImplementationOnce(() =>
