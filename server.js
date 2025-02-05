@@ -20,7 +20,10 @@ app.get("/healthz", async (req, res) => {
   res.set("Pragma", "no-cache");
   res.set("X-Content-Type-Options", "nosniff");
   try {
-    if (req.body && Object.keys(req.body).length > 0) {
+    if (
+      (req.body && Object.keys(req.body).length > 0) ||
+      (req.query && Object.keys(req.query).length > 0)
+    ) {
       res.status(400).send();
     }
     await HealthCheck.create({
