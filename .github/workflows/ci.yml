@@ -1,9 +1,6 @@
 name: WebApp Workflow
 
-on:
-  pull_request:
-    branches:
-      - main
+on: push
 
 jobs:
   test:
