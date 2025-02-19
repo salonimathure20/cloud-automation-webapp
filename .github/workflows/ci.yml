@@ -1,6 +1,9 @@
 name: WebApp Workflow
 
-on: push
+on:
+  pull_request:
+    branches:
+      - "**"
 
 jobs:
   test:
@@ -20,5 +23,5 @@ jobs:
       - name: Install Dependencies
         run: yarn install
 
-      - name: Run Tests
+      - name: Run Application Tests
         run: yarn test
