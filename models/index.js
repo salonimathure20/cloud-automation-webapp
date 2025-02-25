@@ -1,4 +1,4 @@
-const { sequelize } = require("../dbConn");
+const { sequelize } = require("../config/dbConn");
 const HealthCheck = require("./healthCheck");
 
 const initDB = async () => {
