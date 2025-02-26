@@ -1,5 +1,5 @@
 const { DataTypes } = require("sequelize");
-const { sequelize } = require("../dbConn");
+const { sequelize } = require("../config/dbConn");
 
 const HealthCheck = sequelize.define(
   "HealthCheck",
