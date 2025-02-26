@@ -1,0 +1,35 @@
+name: Packer Validation
+
+on:
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - "**.pkr.hcl"
+
+jobs:
+  packer-validation:
+    runs-on: ubuntu-latest
+    name: Validate Packer Configuration
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: "latest"
+
+      - name: Run packer fmt check
+        id: fmt
+        run: |
+          if ! packer fmt -check *.pkr.hcl; then
+            echo "Error: Packer files are not properly formatted"
+            echo "Run 'packer fmt' to format the files"
+            exit 1
+          fi
+
+      - name: Run packer validate
+        id: validate
+        run: |
+          packer validate *.pkr.hcl
