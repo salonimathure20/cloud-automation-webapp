@@ -54,7 +54,6 @@ jobs:
 
       - name: Build application artifact
         run: |
-          yarn build
           zip -r webapp.zip .
 
       - name: Configure AWS credentials
