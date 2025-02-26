@@ -1,0 +1,83 @@
+name: Build and Deploy
+
+on:
+  pull_request:
+    branches:
+      - "**"
+
+env:
+  AWS_REGION: us-east-1
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_ZONE: us-central1-a
+  NODE_VERSION: "18"
+
+jobs:
+  build-and-deploy:
+    # if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Run integration tests
+        run: yarn test
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+
+      - name: Build application artifact
+        run: |
+          yarn build
+          zip -r webapp.zip .
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup GCP credentials
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: "1.9.4"
+
+      - name: Initialize Packer
+        run: packer init .
+
+      - name: Build Packer images
+        run: |
+          packer build \
+            -var "aws_profile=default" \
+            -var "aws_region=${{ env.AWS_REGION }}" \
+            -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var "gcp_zone=${{ env.GCP_ZONE }}" \
+            -var "gcp_private_key_id=${{ secrets.GCP_PRIVATE_KEY_ID }}" \
+            -var "gcp_private_key=${{ secrets.GCP_PRIVATE_KEY }}" \
+            -var "gcp_client_email=${{ secrets.GCP_CLIENT_EMAIL }}" \
+            -var "gcp_client_id=${{ secrets.GCP_CLIENT_ID }}" \
+            -var "db_name=${{ secrets.DB_NAME }}" \
+            -var "db_user=${{ secrets.DB_USER }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "db_port=5432" \
+            -var "app_port=8080" \
+            -var "node_version=${{ env.NODE_VERSION }}" \
+            packer.pkr.hcl
