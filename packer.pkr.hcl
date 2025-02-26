@@ -89,17 +89,17 @@ variable "node_version" {
 
 locals {
   gcp_credentials = jsonencode({
-    type = var.gcp_service_account_type
-    project_id = var.gcp_project_id
-    private_key_id = var.gcp_private_key_id
-    private_key = var.gcp_private_key
-    client_email = var.gcp_client_email
-    client_id = var.gcp_client_id
-    auth_uri = "https://accounts.google.com/o/oauth2/auth"
-    token_uri = "https://oauth2.googleapis.com/token"
+    type                        = var.gcp_service_account_type
+    project_id                  = var.gcp_project_id
+    private_key_id              = var.gcp_private_key_id
+    private_key                 = var.gcp_private_key
+    client_email                = var.gcp_client_email
+    client_id                   = var.gcp_client_id
+    auth_uri                    = "https://accounts.google.com/o/oauth2/auth"
+    token_uri                   = "https://oauth2.googleapis.com/token"
     auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-    client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/${var.gcp_client_email}"
-    universe_domain = "googleapis.com"
+    client_x509_cert_url        = "https://www.googleapis.com/robot/v1/metadata/x509/${var.gcp_client_email}"
+    universe_domain             = "googleapis.com"
   })
 }
 
@@ -131,9 +131,9 @@ source "amazon-ebs" "ubuntu" {
 }
 
 source "googlecompute" "ubuntu" {
-  project_id    = var.gcp_project_id
-  zone          = var.gcp_zone
-  account_file  = local.gcp_credentials
+  project_id   = var.gcp_project_id
+  zone         = var.gcp_zone
+  account_file = local.gcp_credentials
 
   source_image_family     = "ubuntu-2204-lts"
   ssh_username            = "ubuntu"
