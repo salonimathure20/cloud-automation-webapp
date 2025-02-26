@@ -242,7 +242,6 @@ build {
   provisioner "shell" {
     inline = [
       "cd /opt/webapp",
-      "yarn install",
       "sudo tee /etc/systemd/system/webapp.service << EOF",
       "[Unit]",
       "Description=WebApp Node.js Application",
