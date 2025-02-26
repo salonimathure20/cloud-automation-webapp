@@ -31,5 +31,15 @@ jobs:
 
       - name: Run packer validate
         id: validate
+        env:
+          aws_region: ${{ secrets.AWS_REGION }}
+          aws_profile: ${{ secrets.AWS_PROFILE }}
+          gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          gcp_zone: ${{ secrets.GCP_ZONE }}
+          gcp_private_key_id: ${{ secrets.GCP_PRIVATE_KEY_ID }}
+          gcp_private_key: ${{ secrets.GCP_PRIVATE_KEY }}
+          gcp_client_email: ${{ secrets.GCP_CLIENT_EMAIL }}
+          gcp_client_id: ${{ secrets.GCP_CLIENT_ID }}
+          db_password: ${{ secrets.DB_PASSWORD }}
         run: |
           packer validate *.pkr.hcl
