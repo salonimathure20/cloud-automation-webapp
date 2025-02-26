@@ -234,7 +234,7 @@ build {
 
   # Copy application files
   provisioner "file" {
-    source      = "./"
+        source      = "./"
     destination = "/opt/webapp"
   }
 
