@@ -29,17 +29,26 @@ jobs:
             exit 1
           fi
 
+      - name: Run packer init
+        id: init
+        run: packer init *.pkr.hcl
+
       - name: Run packer validate
         id: validate
-        env:
-          aws_region: ${{ secrets.AWS_REGION }}
-          aws_profile: ${{ secrets.AWS_PROFILE }}
-          gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          gcp_zone: ${{ secrets.GCP_ZONE }}
-          gcp_private_key_id: ${{ secrets.GCP_PRIVATE_KEY_ID }}
-          gcp_private_key: ${{ secrets.GCP_PRIVATE_KEY }}
-          gcp_client_email: ${{ secrets.GCP_CLIENT_EMAIL }}
-          gcp_client_id: ${{ secrets.GCP_CLIENT_ID }}
-          db_password: ${{ secrets.DB_PASSWORD }}
         run: |
-          packer validate *.pkr.hcl
+          packer validate \
+            -var "aws_profile=${{ secrets.AWS_PROFILE }}" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var "gcp_zone=${{ secrets.GCP_ZONE }}" \
+            -var "gcp_private_key_id=${{ secrets.GCP_PRIVATE_KEY_ID }}" \
+            -var "gcp_private_key=${{ secrets.GCP_PRIVATE_KEY }}" \
+            -var "gcp_client_email=${{ secrets.GCP_CLIENT_EMAIL }}" \
+            -var "gcp_client_id=${{ secrets.GCP_CLIENT_ID }}" \
+            -var "db_name=${{ secrets.DB_NAME }}" \
+            -var "db_user=${{ secrets.DB_USER }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "db_port=${{ secrets.DB_PORT }}" \
+            -var "app_port=${{ secrets.APP_PORT }}" \
+            -var "node_version=${{ secrets.NODE_VERSION }}" \
+            *.pkr.hcl
