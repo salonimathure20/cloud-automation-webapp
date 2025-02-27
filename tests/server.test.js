@@ -63,7 +63,7 @@ describe("/healthz endpoint", () => {
     expect(res.status).toBe(405);
   });
 
-  it("should return 405 for disallowed methods", async () => {
+  it("should return 405 for methods that are not allowed", async () => {
     const res = await request(app).patch("/healthz");
     expect(res.status).toBe(405);
   });
