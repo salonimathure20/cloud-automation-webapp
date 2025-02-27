@@ -108,15 +108,7 @@ source "amazon-ebs" "ubuntu" {
   profile = var.aws_profile
   region  = var.aws_region
 
-  source_ami_filter {
-    filters = {
-      name                = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-    }
-    most_recent = true
-    owners      = ["099720109477"] # Canonical
-  }
+  source_ami = "ami-029f33a91738d30e9"
 
   instance_type = "t2.micro"
   ssh_username  = "ubuntu"
@@ -135,7 +127,7 @@ source "googlecompute" "ubuntu" {
   zone         = var.gcp_zone
   account_file = local.gcp_credentials
 
-  source_image_family     = "ubuntu-2204-lts"
+  source_image_family     = "ubuntu-2404-lts-amd64"
   ssh_username            = "ubuntu"
   image_name              = "webapp-{{timestamp}}"
   image_family            = "webapp"
@@ -152,6 +144,14 @@ build {
     "source.googlecompute.ubuntu"
   ]
 
+  # Create local user csye6225
+  provisioner "shell" {
+    inline = [
+      "sudo groupadd csye6225",
+      "sudo useradd -m -s /usr/sbin/nologin -g csye6225 csye6225"
+    ]
+  }
+
   # Install required packages
   provisioner "shell" {
     inline = [
@@ -161,7 +161,7 @@ build {
       "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg lsb-release",
       # Add PostgreSQL repository
       "curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg",
-      "echo 'deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt/ jammy-pgdg main' | sudo tee /etc/apt/sources.list.d/postgresql.list",
+      "echo 'deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt/ noble-pgdg main' | sudo tee /etc/apt/sources.list.d/postgresql.list",
       # Add Node.js repository
       "sudo mkdir -p /etc/apt/keyrings",
       "curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg",
@@ -209,7 +209,7 @@ build {
       "  sleep 2",
       "done",
       "for i in {1..5}; do",
-      "  if sudo -u postgres psql -c \"ALTER USER ${var.db_user} PASSWORD '${var.db_password}';\" && sudo -u postgres createdb ${var.db_name}; then",
+      "  if sudo -u postgres psql -c \"ALTER USER ${var.db_user} PASSWORD '${var.db_password}';\"; then",
       "    echo 'PostgreSQL configuration successful'",
       "    break",
       "  else",
@@ -228,7 +228,7 @@ build {
   provisioner "shell" {
     inline = [
       "sudo mkdir -p /opt/webapp",
-      "sudo chown ubuntu:ubuntu /opt/webapp"
+      "sudo chown -R ubuntu:ubuntu /opt/webapp"
     ]
   }
 
@@ -241,6 +241,7 @@ build {
   # Setup environment and start application
   provisioner "shell" {
     inline = [
+      "sudo chown -R csye6225:csye6225 /opt/webapp",
       "cd /opt/webapp",
       "sudo tee /etc/systemd/system/webapp.service << EOF",
       "[Unit]",
@@ -249,7 +250,7 @@ build {
       "",
       "[Service]",
       "Type=simple",
-      "User=ubuntu",
+      "User=csye6225",
       "WorkingDirectory=/opt/webapp",
       "Environment=DB_NAME=${var.db_name}",
       "Environment=DB_USER=${var.db_user}",
@@ -263,8 +264,9 @@ build {
       "[Install]",
       "WantedBy=multi-user.target",
       "EOF",
+      "sudo systemctl daemon-reload",
       "sudo systemctl enable webapp",
       "sudo systemctl start webapp"
     ]
   }
-} 
+}
