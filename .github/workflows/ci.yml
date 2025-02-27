@@ -1,13 +1,19 @@
-name: WebApp Workflow
+name: CI and Deployment Workflow
 
 on:
   pull_request:
     branches:
       - "**"
+    types: [opened, synchronize, reopened, closed]
+
+env:
+  AWS_REGION: us-east-1
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_ZONE: us-central1-a
+  NODE_VERSION: "18"
 
 jobs:
-  test:
-    name: Run Web App Tests
+  test-and-deploy:
     runs-on: ubuntu-latest
 
     services:
@@ -32,7 +38,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ env.NODE_VERSION }}
           cache: "yarn"
 
       - name: Install Dependencies
@@ -46,3 +52,59 @@ jobs:
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
         run: yarn test
+
+      - name: Configure AWS credentials
+        if: github.event.pull_request.merged == true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup GCP credentials
+        if: github.event.pull_request.merged == true
+        run: |
+          echo '{
+            "type": "service_account",
+            "project_id": "${{ secrets.GCP_PROJECT_ID }}",
+            "private_key_id": "${{ secrets.GCP_PRIVATE_KEY_ID }}",
+            "private_key": "${{ secrets.GCP_PRIVATE_KEY }}",
+            "client_email": "${{ secrets.GCP_CLIENT_EMAIL }}",
+            "client_id": "${{ secrets.GCP_CLIENT_ID }}",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/${{ secrets.GCP_CLIENT_EMAIL }}"
+          }' > gcp-credentials.json
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: gcp-credentials.json
+
+      - name: Install Packer
+        if: github.event.pull_request.merged == true
+        uses: hashicorp/setup-packer@main
+        with:
+          version: "1.9.4"
+
+      - name: Initialize Packer
+        if: github.event.pull_request.merged == true
+        run: packer init .
+
+      - name: Build Packer images
+        if: github.event.pull_request.merged == true
+        run: |
+          packer build \
+            -var "aws_profile=default" \
+            -var "aws_region=${{ env.AWS_REGION }}" \
+            -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var "gcp_zone=${{ env.GCP_ZONE }}" \
+            -var "gcp_private_key_id=${{ secrets.GCP_PRIVATE_KEY_ID }}" \
+            -var "gcp_private_key=${{ secrets.GCP_PRIVATE_KEY }}" \
+            -var "gcp_client_email=${{ secrets.GCP_CLIENT_EMAIL }}" \
+            -var "gcp_client_id=${{ secrets.GCP_CLIENT_ID }}" \
+            -var "db_name=${{ secrets.DB_NAME }}" \
+            -var "db_user=${{ secrets.DB_USER }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "db_port=${{ secrets.DB_PORT }}" \
+            -var "app_port=8080" \
+            -var "node_version=${{ env.NODE_VERSION }}" \
+            packer.pkr.hcl
