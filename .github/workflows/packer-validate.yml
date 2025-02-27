@@ -1,0 +1,54 @@
+name: Packer Validation
+
+on:
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - "**.pkr.hcl"
+
+jobs:
+  packer-validation:
+    runs-on: ubuntu-latest
+    name: Validate Packer Configuration
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: "latest"
+
+      - name: Run packer fmt check
+        id: fmt
+        run: |
+          if ! packer fmt -check *.pkr.hcl; then
+            echo "Error: Packer files are not properly formatted"
+            echo "Run 'packer fmt' to format the files"
+            exit 1
+          fi
+
+      - name: Run packer init
+        id: init
+        run: packer init *.pkr.hcl
+
+      - name: Run packer validate
+        id: validate
+        run: |
+          packer validate \
+            -var "aws_profile=${{ secrets.AWS_PROFILE }}" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var "gcp_zone=${{ secrets.GCP_ZONE }}" \
+            -var "gcp_private_key_id=${{ secrets.GCP_PRIVATE_KEY_ID }}" \
+            -var "gcp_private_key=${{ secrets.GCP_PRIVATE_KEY }}" \
+            -var "gcp_client_email=${{ secrets.GCP_CLIENT_EMAIL }}" \
+            -var "gcp_client_id=${{ secrets.GCP_CLIENT_ID }}" \
+            -var "db_name=${{ secrets.DB_NAME }}" \
+            -var "db_user=${{ secrets.DB_USER }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "db_port=${{ secrets.DB_PORT }}" \
+            -var "app_port=${{ secrets.APP_PORT }}" \
+            -var "node_version=${{ secrets.NODE_VERSION }}" \
+            *.pkr.hcl
