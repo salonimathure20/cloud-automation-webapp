@@ -1,7 +1,6 @@
 require("dotenv").config();
 const request = require("supertest");
-const { HealthCheck, initDB } = require("../models");
-const { Sequelize } = require("sequelize");
+const { HealthCheck } = require("../models");
 const { sequelize } = require("../config/dbConn");
 
 const app = require("../server");
@@ -11,7 +10,7 @@ describe("/healthz endpoint", () => {
   beforeAll(async () => {
     try {
       await connectDB();
-      await initDB();
+      await sequelize.sync({ force: true });
     } catch (error) {
       console.error("Unable to connect to the database:", error);
       throw error;
