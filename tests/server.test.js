@@ -48,20 +48,6 @@ describe("/healthz endpoint", () => {
     expect(res.status).toBe(400);
   });
 
-  // it("should return 503 when database insert fails", async () => {
-  //   HealthCheck.create.mockImplementationOnce(() =>
-  //     Promise.reject(new Error("DB error"))
-  //   );
-
-  //   const res = await request(app).get("/healthz");
-
-  //   console.log("Response status:", res.status); // Debugging
-  //   console.log("Response text:", res.text); // Debugging
-
-  //   expect(res.status).toBe(503);
-  //   expect(HealthCheck.create).toHaveBeenCalledTimes(1);
-  // });
-
   it("should return 405 for disallowed methods", async () => {
     const res = await request(app).post("/healthz");
     expect(res.status).toBe(405);
