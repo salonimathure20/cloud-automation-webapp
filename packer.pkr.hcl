@@ -23,7 +23,7 @@ variable "aws_profile" {
 }
 
 variable "aws_demo_id" {
-  type    = string
+  type = string
 }
 
 # Variables for GCP
