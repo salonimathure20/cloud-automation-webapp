@@ -22,6 +22,10 @@ variable "aws_profile" {
   default = "default"
 }
 
+variable "aws_demo_id" {
+  type    = string
+}
+
 # Variables for GCP
 variable "gcp_project_id" {
   type = string
