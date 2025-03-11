@@ -113,6 +113,7 @@ source "amazon-ebs" "ubuntu" {
   instance_type = "t2.micro"
   ssh_username  = "ubuntu"
   ami_name      = "webapp-{{timestamp}}"
+  ami_users     = [var.aws_demo_id]
 
   launch_block_device_mappings {
     device_name           = "/dev/sda1"
