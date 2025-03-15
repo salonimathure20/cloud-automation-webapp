@@ -31,7 +31,7 @@ variable "gcp_project_id" {
   type = string
 }
 
-variable "gcp_target_project_id" {
+variable "gcp_demo_id" {
   type        = string
   description = "The project ID to share the image with"
 }
@@ -290,7 +290,7 @@ build {
       "LATEST_IMAGE=$(gcloud compute images list --project=${var.gcp_project_id} --filter=\"name~'webapp-.*'\" --sort-by=~creationTimestamp --limit=1 --format='get(name)')",
       "if [ -n \"$LATEST_IMAGE\" ]; then",
       "  echo \"Sharing image: $LATEST_IMAGE\"",
-      "  gcloud compute images create \"$LATEST_IMAGE\" --source-image=\"$LATEST_IMAGE\" --source-image-project=${var.gcp_project_id} --project=${var.gcp_target_project_id}",
+      "  gcloud compute images create \"$LATEST_IMAGE\" --source-image=\"$LATEST_IMAGE\" --source-image-project=${var.gcp_project_id} --project=${var.gcp_demo_id}",
       "else",
       "  echo \"No webapp image found\"",
       "  exit 1",
