@@ -287,6 +287,13 @@ build {
   post-processor "shell-local" {
     only = ["googlecompute.ubuntu"]
     inline = [
+      "echo 'Setting up authentication...'",
+      "cat > /tmp/packer-gcp-key.json << 'EOF'",
+      "${local.gcp_credentials}",
+      "EOF",
+      "export GOOGLE_APPLICATION_CREDENTIALS=/tmp/packer-gcp-key.json",
+      "gcloud auth activate-service-account --key-file=/tmp/packer-gcp-key.json",
+      "gcloud config set project ${var.gcp_project_id}",
       "LATEST_IMAGE=$(gcloud compute images list --project=${var.gcp_project_id} --filter=\"name~'webapp-.*'\" --sort-by=~creationTimestamp --limit=1 --format='get(name)')",
       "if [ -n \"$LATEST_IMAGE\" ]; then",
       "  echo \"Sharing image: $LATEST_IMAGE\"",
@@ -294,7 +301,8 @@ build {
       "else",
       "  echo \"No webapp image found\"",
       "  exit 1",
-      "fi"
+      "fi",
+      "rm -f /tmp/packer-gcp-key.json"
     ]
   }
 }
