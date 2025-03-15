@@ -32,7 +32,7 @@ variable "gcp_project_id" {
 }
 
 variable "gcp_target_project_id" {
-  type = string
+  type        = string
   description = "The project ID to share the image with"
 }
 
