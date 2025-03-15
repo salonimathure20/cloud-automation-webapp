@@ -44,6 +44,7 @@ jobs:
             -var "gcp_private_key=${{ secrets.GCP_PRIVATE_KEY }}" \
             -var "gcp_client_email=${{ secrets.GCP_CLIENT_EMAIL }}" \
             -var "gcp_client_id=${{ secrets.GCP_CLIENT_ID }}" \
+            -var "gcp_demo_id=${{ secrets.GCP_DEMO_ID }}" \
             -var "db_name=${{ secrets.DB_NAME }}" \
             -var "db_user=${{ secrets.DB_USER }}" \
             -var "db_password=${{ secrets.DB_PASSWORD }}" \

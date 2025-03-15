@@ -31,6 +31,11 @@ variable "gcp_project_id" {
   type = string
 }
 
+variable "gcp_demo_id" {
+  type        = string
+  description = "The project ID to share the image with"
+}
+
 variable "gcp_zone" {
   type    = string
   default = "us-central1-a"
@@ -137,6 +142,9 @@ source "googlecompute" "ubuntu" {
   image_name              = "webapp-{{timestamp}}"
   image_family            = "webapp"
   image_storage_locations = ["us"]
+  image_labels = {
+    created_by = "packer"
+  }
 
   disk_size    = 20
   disk_type    = "pd-standard"
@@ -272,6 +280,21 @@ build {
       "sudo systemctl daemon-reload",
       "sudo systemctl enable webapp",
       "sudo systemctl start webapp"
+    ]
+  }
+
+  # Share GCP image with target project
+  post-processor "shell-local" {
+    only = ["googlecompute.ubuntu"]
+    inline = [
+      "LATEST_IMAGE=$(gcloud compute images list --project=${var.gcp_project_id} --filter=\"name~'webapp-.*'\" --sort-by=~creationTimestamp --limit=1 --format='get(name)')",
+      "if [ -n \"$LATEST_IMAGE\" ]; then",
+      "  echo \"Sharing image: $LATEST_IMAGE\"",
+      "  gcloud compute images create \"$LATEST_IMAGE\" --source-image=\"$LATEST_IMAGE\" --source-image-project=${var.gcp_project_id} --project=${var.gcp_demo_id}",
+      "else",
+      "  echo \"No webapp image found\"",
+      "  exit 1",
+      "fi"
     ]
   }
 }
