@@ -10,4 +10,4 @@ router.get("/", healthzController);
 
 router.all("/", healthzAllController);
 
-module.exports = { router };
+module.exports = router;

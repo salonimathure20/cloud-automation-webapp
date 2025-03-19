@@ -1,7 +1,11 @@
-const { router } = require("./healthz-router");
+const healthCheckRoutes = require("./healthz-router");
+const fileRoutes = require("./fileRoutes");
 
 const initializeRoutes = async (app) => {
-  app.use("/healthz", router);
+  app.use("/healthz", healthCheckRoutes);
+  app.use("/v1/file", fileRoutes);
 };
 
-module.exports = { initializeRoutes };
+module.exports = {
+  initializeRoutes,
+};
