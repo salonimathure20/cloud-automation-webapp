@@ -226,7 +226,7 @@ build {
       "# DB_PASSWORD=<DB_PASSWORD>",
       "# DB_PORT=<DB_PORT>",
       "EOF",
-      "sudo chmod 600 /etc/webapp/environment",  # Secure the environment file
+      "sudo chmod 600 /etc/webapp/environment", # Secure the environment file
       # Set proper permissions
       "sudo chmod 755 /opt/webapp",
       "sudo chmod 644 /etc/systemd/system/webapp.service",
