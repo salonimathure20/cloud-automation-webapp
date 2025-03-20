@@ -45,10 +45,6 @@ jobs:
             -var "gcp_client_email=${{ secrets.GCP_CLIENT_EMAIL }}" \
             -var "gcp_client_id=${{ secrets.GCP_CLIENT_ID }}" \
             -var "gcp_demo_id=${{ secrets.GCP_DEMO_ID }}" \
-            -var "db_name=${{ secrets.DB_NAME }}" \
-            -var "db_user=${{ secrets.DB_USER }}" \
-            -var "db_password=${{ secrets.DB_PASSWORD }}" \
-            -var "db_port=${{ secrets.DB_PORT }}" \
             -var "app_port=${{ secrets.APP_PORT }}" \
             -var "node_version=${{ secrets.NODE_VERSION }}" \
             *.pkr.hcl

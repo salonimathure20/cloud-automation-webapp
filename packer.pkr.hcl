@@ -65,27 +65,6 @@ variable "gcp_client_id" {
   type = string
 }
 
-# Application Variables
-variable "db_name" {
-  type    = string
-  default = "postgres"
-}
-
-variable "db_user" {
-  type    = string
-  default = "postgres"
-}
-
-variable "db_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "db_port" {
-  type    = string
-  default = "5432"
-}
-
 variable "app_port" {
   type    = string
   default = "8080"
@@ -172,68 +151,18 @@ build {
       "sudo rm -rf /var/lib/apt/lists/*",
       "sudo apt-get update",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg lsb-release",
-      # Add PostgreSQL repository
-      "curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg",
-      "echo 'deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt/ noble-pgdg main' | sudo tee /etc/apt/sources.list.d/postgresql.list",
       # Add Node.js repository
       "sudo mkdir -p /etc/apt/keyrings",
       "curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg",
       "echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${var.node_version}.x nodistro main' | sudo tee /etc/apt/sources.list.d/nodesource.list",
-      # Update and install packages with retries
-      "for i in {1..3}; do",
-      "  if sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-14 postgresql-contrib-14; then",
-      "    break",
-      "  else",
-      "    echo \"Attempt $i failed. Waiting before retry...\"",
-      "    sleep 10",
-      "  fi",
-      "done",
+      # Update and install Node.js
+      "sudo apt-get update",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs",
       # Install Yarn
       "curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/yarn-keyring.gpg",
       "echo 'deb [signed-by=/usr/share/keyrings/yarn-keyring.gpg] https://dl.yarnpkg.com/debian stable main' | sudo tee /etc/apt/sources.list.d/yarn.list",
       "sudo apt-get update",
-      "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y yarn",
-      # Start PostgreSQL with retry
-      "for i in {1..5}; do",
-      "  sudo systemctl start postgresql",
-      "  if sudo systemctl is-active --quiet postgresql; then",
-      "    echo 'PostgreSQL started successfully'",
-      "    break",
-      "  else",
-      "    echo \"PostgreSQL start attempt $i failed. Waiting before retry...\"",
-      "    sleep 10",
-      "  fi",
-      "done",
-      "sudo systemctl enable postgresql"
-    ]
-  }
-
-  # Configure PostgreSQL with retry mechanism and proper initialization wait
-  provisioner "shell" {
-    inline = [
-      "echo 'Waiting for PostgreSQL to be ready...'",
-      "for i in {1..30}; do",
-      "  if sudo -u postgres psql -c '\\l' >/dev/null 2>&1; then",
-      "    echo 'PostgreSQL is ready'",
-      "    break",
-      "  fi",
-      "  echo 'Waiting for PostgreSQL to start...'",
-      "  sleep 2",
-      "done",
-      "for i in {1..5}; do",
-      "  if sudo -u postgres psql -c \"ALTER USER ${var.db_user} PASSWORD '${var.db_password}';\"; then",
-      "    echo 'PostgreSQL configuration successful'",
-      "    break",
-      "  else",
-      "    echo \"Attempt $i failed. Waiting before retry...\"",
-      "    sleep 10",
-      "  fi",
-      "  if [ $i -eq 5 ]; then",
-      "    echo 'Failed to configure PostgreSQL after 5 attempts'",
-      "    exit 1",
-      "  fi",
-      "done"
+      "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y yarn"
     ]
   }
 
@@ -256,30 +185,56 @@ build {
     inline = [
       "sudo chown -R csye6225:csye6225 /opt/webapp",
       "cd /opt/webapp",
+      # Install dependencies
+      "sudo -u csye6225 yarn install --production",
+      # Run build first
+      "sudo -u csye6225 yarn install",
+      # Create environment file directory
+      "sudo mkdir -p /etc/webapp",
+      "sudo chown csye6225:csye6225 /etc/webapp",
+      # Create log directory
+      "sudo mkdir -p /var/log/webapp",
+      "sudo chown csye6225:csye6225 /var/log/webapp",
+      # Create systemd service file with better logging and permissions
       "sudo tee /etc/systemd/system/webapp.service << EOF",
       "[Unit]",
       "Description=WebApp Node.js Application",
-      "After=network.target postgresql.service",
+      "After=network.target",
       "",
       "[Service]",
       "Type=simple",
       "User=csye6225",
+      "Group=csye6225",
       "WorkingDirectory=/opt/webapp",
-      "Environment=DB_NAME=${var.db_name}",
-      "Environment=DB_USER=${var.db_user}",
-      "Environment=DB_PASSWORD=${var.db_password}",
-      "Environment=DB_HOST=localhost",
-      "Environment=DB_PORT=${var.db_port}",
-      "Environment=PORT=${var.app_port}",
+      "EnvironmentFile=/etc/webapp/environment",
       "ExecStart=/usr/bin/yarn start",
+      "StandardOutput=append:/var/log/webapp/output.log",
+      "StandardError=append:/var/log/webapp/error.log",
       "Restart=always",
+      "RestartSec=10",
       "",
       "[Install]",
       "WantedBy=multi-user.target",
       "EOF",
+      # Create a placeholder environment file
+      "sudo tee /etc/webapp/environment << EOF",
+      "PORT=${var.app_port}",
+      "# The following will be set by terraform user data:",
+      "# DB_HOST=<RDS_ENDPOINT>",
+      "# DB_NAME=<DB_NAME>",
+      "# DB_USER=<DB_USER>",
+      "# DB_PASSWORD=<DB_PASSWORD>",
+      "# DB_PORT=<DB_PORT>",
+      "EOF",
+      "sudo chmod 600 /etc/webapp/environment", # Secure the environment file
+      # Set proper permissions
+      "sudo chmod 755 /opt/webapp",
+      "sudo chmod 644 /etc/systemd/system/webapp.service",
+      "sudo touch /var/log/webapp/output.log /var/log/webapp/error.log",
+      "sudo chown csye6225:csye6225 /var/log/webapp/output.log /var/log/webapp/error.log",
       "sudo systemctl daemon-reload",
-      "sudo systemctl enable webapp",
-      "sudo systemctl start webapp"
+      "sudo systemctl enable webapp"
+      # Service will be started by terraform user data after setting DB configuration
     ]
   }
 
