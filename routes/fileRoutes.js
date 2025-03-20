@@ -20,7 +20,7 @@ const upload = multer({
  * POST /v1/file - Upload a new file
  * No authentication required
  */
-router.post("/", upload.single("file"), fileController.uploadFile);
+router.post("/", upload.single("profilePic"), fileController.uploadFile);
 
 /**
  * @public

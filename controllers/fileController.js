@@ -19,12 +19,10 @@ const uploadFile = async (req, res) => {
     });
 
     res.status(201).json({
-      file_id: file.file_id,
       file_name: file.file_name,
-      s3_object_key: file.s3_object_key,
-      file_size: file.file_size,
-      file_type: file.file_type,
-      created_date: file.created_date,
+      id: file.file_id,
+      url: `${process.env.S3_BUCKET}/${file.file_id}/${file.file_name}`,
+      upload_date: file.created_date,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -39,12 +37,10 @@ const getFile = async (req, res) => {
     }
 
     res.json({
-      file_id: file.file_id,
       file_name: file.file_name,
-      s3_object_key: file.s3_object_key,
-      file_size: file.file_size,
-      file_type: file.file_type,
-      created_date: file.created_date,
+      id: file.file_id,
+      url: `${process.env.S3_BUCKET}/${file.file_id}/${file.file_name}`,
+      upload_date: file.created_date,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
