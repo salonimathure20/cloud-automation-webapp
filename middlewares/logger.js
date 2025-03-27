@@ -52,7 +52,7 @@ class CloudWatchMetricsLogger {
   error(message, error) {
     const errorMeta = {
       error: error?.message || error,
-      stack: error.stack,
+      stack: error?.stack || "",
     };
     this.logger.error(message, errorMeta);
     this._pushToCloudWatch("error", message, errorMeta);
