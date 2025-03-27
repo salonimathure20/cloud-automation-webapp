@@ -133,7 +133,7 @@ source "googlecompute" "ubuntu" {
 build {
   sources = [
     "source.amazon-ebs.ubuntu",
-    "source.googlecompute.ubuntu"
+    # "source.googlecompute.ubuntu"
   ]
 
   # Create local user csye6225
@@ -151,6 +151,10 @@ build {
       "sudo rm -rf /var/lib/apt/lists/*",
       "sudo apt-get update",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg lsb-release",
+      # Install CloudWatch Agent
+      "wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb",
+      "sudo dpkg -i -E ./amazon-cloudwatch-agent.deb",
+      "rm amazon-cloudwatch-agent.deb",
       # Add Node.js repository
       "sudo mkdir -p /etc/apt/keyrings",
       "curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg",
@@ -163,6 +167,66 @@ build {
       "echo 'deb [signed-by=/usr/share/keyrings/yarn-keyring.gpg] https://dl.yarnpkg.com/debian stable main' | sudo tee /etc/apt/sources.list.d/yarn.list",
       "sudo apt-get update",
       "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y yarn"
+    ]
+  }
+
+  # Configure CloudWatch Agent
+  provisioner "shell" {
+    inline = [
+      "sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/",
+      "sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOF'",
+      "{",
+      "  \"agent\": {",
+      "    \"metrics_collection_interval\": 60,",
+      "    \"run_as_user\": \"cwagent\"",
+      "  },",
+      "  \"logs\": {",
+      "    \"logs_collected\": {",
+      "      \"files\": {",
+      "        \"collect_list\": [",
+      "          {",
+      "            \"file_path\": \"/var/log/webapp/output.log\",",
+      "            \"log_group_name\": \"webapp-output\",",
+      "            \"log_stream_name\": \"{instance_id}\",",
+      "            \"timezone\": \"UTC\"",
+      "          },",
+      "          {",
+      "            \"file_path\": \"/var/log/webapp/error.log\",",
+      "            \"log_group_name\": \"webapp-error\",",
+      "            \"log_stream_name\": \"{instance_id}\",",
+      "            \"timezone\": \"UTC\"",
+      "          }",
+      "        ]",
+      "      }",
+      "    }",
+      "  },",
+      "  \"metrics\": {",
+      "    \"metrics_collected\": {",
+      "      \"disk\": {",
+      "        \"measurement\": [",
+      "          \"used_percent\"",
+      "        ],",
+      "        \"metrics_collection_interval\": 60,",
+      "        \"resources\": [",
+      "          \"/\"",
+      "        ]",
+      "      },",
+      "      \"mem\": {",
+      "        \"measurement\": [",
+      "          \"mem_used_percent\"",
+      "        ],",
+      "        \"metrics_collection_interval\": 60",
+      "      }",
+      "    }",
+      "  }",
+      "}",
+      "EOF",
+      "sudo chown -R root:root /opt/aws/amazon-cloudwatch-agent/etc/",
+      "sudo chmod 644 /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+      # Verify installation
+      "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a status",
+      # Enable CloudWatch Agent to start on boot
+      "sudo systemctl enable amazon-cloudwatch-agent"
     ]
   }
 
@@ -239,25 +303,25 @@ build {
   }
 
   # Share GCP image with target project
-  post-processor "shell-local" {
-    only = ["googlecompute.ubuntu"]
-    inline = [
-      "echo 'Setting up authentication...'",
-      "cat > /tmp/packer-gcp-key.json << 'EOF'",
-      "${local.gcp_credentials}",
-      "EOF",
-      "export GOOGLE_APPLICATION_CREDENTIALS=/tmp/packer-gcp-key.json",
-      "gcloud auth activate-service-account --key-file=/tmp/packer-gcp-key.json",
-      "gcloud config set project ${var.gcp_project_id}",
-      "LATEST_IMAGE=$(gcloud compute images list --project=${var.gcp_project_id} --filter=\"name~'webapp-.*'\" --sort-by=~creationTimestamp --limit=1 --format='get(name)')",
-      "if [ -n \"$LATEST_IMAGE\" ]; then",
-      "  echo \"Sharing image: $LATEST_IMAGE\"",
-      "  gcloud compute images create \"$LATEST_IMAGE\" --source-image=\"$LATEST_IMAGE\" --source-image-project=${var.gcp_project_id} --project=${var.gcp_demo_id}",
-      "else",
-      "  echo \"No webapp image found\"",
-      "  exit 1",
-      "fi",
-      "rm -f /tmp/packer-gcp-key.json"
-    ]
-  }
+  # post-processor "shell-local" {
+  #   only = ["googlecompute.ubuntu"]
+  #   inline = [
+  #     "echo 'Setting up authentication...'",
+  #     "cat > /tmp/packer-gcp-key.json << 'EOF'",
+  #     "${local.gcp_credentials}",
+  #     "EOF",
+  #     "export GOOGLE_APPLICATION_CREDENTIALS=/tmp/packer-gcp-key.json",
+  #     "gcloud auth activate-service-account --key-file=/tmp/packer-gcp-key.json",
+  #     "gcloud config set project ${var.gcp_project_id}",
+  #     "LATEST_IMAGE=$(gcloud compute images list --project=${var.gcp_project_id} --filter=\"name~'webapp-.*'\" --sort-by=~creationTimestamp --limit=1 --format='get(name)')",
+  #     "if [ -n \"$LATEST_IMAGE\" ]; then",
+  #     "  echo \"Sharing image: $LATEST_IMAGE\"",
+  #     "  gcloud compute images create \"$LATEST_IMAGE\" --source-image=\"$LATEST_IMAGE\" --source-image-project=${var.gcp_project_id} --project=${var.gcp_demo_id}",
+  #     "else",
+  #     "  echo \"No webapp image found\"",
+  #     "  exit 1",
+  #     "fi",
+  #     "rm -f /tmp/packer-gcp-key.json"
+  #   ]
+  # }
 }

@@ -1,37 +1,39 @@
 const winston = require("winston");
-// Default exported function that will set up Winston for logging
-// Getting the required function from the format module
-const { combine, timestamp, label, printf } = winston.format;
+const WinstonCloudWatch = require("winston-cloudwatch");
 
-// Creating a custom formats for logs
-const customFormat = printf(({ level, message, label, timestamp }) => {
-  return `${timestamp}, ${level.toUpperCase()} [${label}] => ${message}`;
-});
-
-// Create a logger using winston
 const logger = winston.createLogger({
-  // Setting the level to log info or higher only
   level: "info",
-  // Using the custom format for logging
+  format: winston.format.json(),
+  defaultMeta: { service: "webapp" },
   transports: [
-    new winston.transports.Console({
-      level: "info",
-      format: combine(
-        label({ label: "WEBAPP.SERVER" }),
-        timestamp({ format: "YYYY-MM-DDTHH:mm:ss:ms" }),
-        customFormat
-      ),
+    new winston.transports.Console(),
+    new WinstonCloudWatch({
+      logGroupName: "webapp-logs",
+      logStreamName: `${process.env.NODE_ENV || "development"}-${
+        new Date().toISOString().split("T")[0]
+      }`,
+      awsRegion: "us-east-1",
+      jsonMessage: true,
+      messageFormatter: ({ level, message, ...meta }) => {
+        return JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level,
+          message,
+          environment: process.env.NODE_ENV || "development",
+          ...meta,
+        });
+      },
     }),
   ],
-  // Do not exit application in case of an error
-  exitOnError: false,
 });
 
-logger.add(
-  new winston.transports.Console({
-    level: "silly",
-    format: winston.format.simple(),
-  })
-);
+// Add error handler for CloudWatch transport
+logger.transports.forEach((transport) => {
+  if (transport instanceof WinstonCloudWatch) {
+    transport.on("error", (error) => {
+      console.error("CloudWatch logging error:", error);
+    });
+  }
+});
 
 module.exports = { logger };

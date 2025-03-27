@@ -4,11 +4,13 @@ const { connectDB } = require("./config/dbConn");
 const { initDB } = require("./models");
 const { initializeRoutes } = require("./routes/index");
 const { logger } = require("./middlewares/logger");
+const metricsMiddleware = require("./middlewares/metricsMiddleware");
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
+app.use(metricsMiddleware);
 
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
