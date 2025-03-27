@@ -35,20 +35,19 @@ const healthzController = async (req, res) => {
 
 const healthzAllController = (req, res) => {
   const startTime = Date.now();
-  try {
-    cloudWatchLogger.info("Health check initiated");
-    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.set("Pragma", "no-cache");
-    res.set("X-Content-Type-Options", "nosniff");
 
-    cloudWatchLogger.trackApiCall("healthz");
+  cloudWatchLogger.info("Health check initiated");
+  res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("X-Content-Type-Options", "nosniff");
 
-    // Measure API time
-    cloudWatchLogger.measureApiTime("healthz", startTime);
-  } catch (error) {
-    cloudWatchLogger.error("Request method not supported", error);
-    res.status(405).send();
-  }
+  cloudWatchLogger.trackApiCall("healthz");
+
+  // Measure API time
+  cloudWatchLogger.measureApiTime("healthz", startTime);
+
+  cloudWatchLogger.error("Request method not supported");
+  res.status(405).send();
 };
 
 module.exports = { healthzController, healthzAllController };
