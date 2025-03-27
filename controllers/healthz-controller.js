@@ -13,8 +13,7 @@ const healthzController = async (req, res) => {
       (req.query && Object.keys(req.query).length > 0)
     ) {
       cloudWatchLogger.error(
-        "Bad Request: Request payload has body and query params",
-        error
+        "Bad Request: Request payload has body and query params"
       );
       res.status(400).send();
     }
