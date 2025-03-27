@@ -133,7 +133,7 @@ source "googlecompute" "ubuntu" {
 build {
   sources = [
     "source.amazon-ebs.ubuntu",
-    "source.googlecompute.ubuntu"
+    # "source.googlecompute.ubuntu"
   ]
 
   # Create local user csye6225
@@ -166,11 +166,23 @@ build {
     ]
   }
 
-  # Create app directory and set permissions
+  # CloudWatch Agent Installation
+  provisioner "shell" {
+    inline = [
+      # Download and install CloudWatch Agent
+      "wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb",
+      "sudo dpkg -i amazon-cloudwatch-agent.deb",
+      "rm amazon-cloudwatch-agent.deb"
+    ]
+  }
+
+  # Create application and log directories
   provisioner "shell" {
     inline = [
       "sudo mkdir -p /opt/webapp",
-      "sudo chown -R ubuntu:ubuntu /opt/webapp"
+      "sudo chown -R ubuntu:ubuntu /opt/webapp",
+      "sudo mkdir -p /var/log/webapp",
+      "sudo chown csye6225:csye6225 /var/log/webapp"
     ]
   }
 
@@ -180,21 +192,61 @@ build {
     destination = "/opt/webapp"
   }
 
+  # Create CloudWatch Agent Configuration
+  provisioner "file" {
+    content     = <<-EOF
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/webapp/output.log",
+            "log_group_name": "/webapp/application-logs",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/var/log/webapp/error.log",
+            "log_group_name": "/webapp/application-logs",
+            "log_stream_name": "{instance_id}"
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "WebAppMetrics",
+    "metrics_collected": {
+      "statsd": {
+        "service_address": ":8125"
+      }
+    }
+  }
+}
+EOF
+    destination = "/tmp/amazon-cloudwatch-agent.json"
+  }
+
   # Setup environment and start application
   provisioner "shell" {
     inline = [
+      # Setup CloudWatch Agent Configuration
+      "sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc",
+      "sudo cp /tmp/amazon-cloudwatch-agent.json /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+      "sudo chown root:root /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+
+      # Modify ownership and permissions
       "sudo chown -R csye6225:csye6225 /opt/webapp",
       "cd /opt/webapp",
+
       # Install dependencies
       "sudo -u csye6225 yarn install --production",
-      # Run build first
       "sudo -u csye6225 yarn install",
+
       # Create environment file directory
       "sudo mkdir -p /etc/webapp",
       "sudo chown csye6225:csye6225 /etc/webapp",
-      # Create log directory
-      "sudo mkdir -p /var/log/webapp",
-      "sudo chown csye6225:csye6225 /var/log/webapp",
+
       # Create systemd service file with better logging and permissions
       "sudo tee /etc/systemd/system/webapp.service << EOF",
       "[Unit]",
@@ -216,6 +268,7 @@ build {
       "[Install]",
       "WantedBy=multi-user.target",
       "EOF",
+
       # Create a placeholder environment file
       "sudo tee /etc/webapp/environment << EOF",
       "PORT=${var.app_port}",
@@ -226,38 +279,44 @@ build {
       "# DB_PASSWORD=<DB_PASSWORD>",
       "# DB_PORT=<DB_PORT>",
       "EOF",
-      "sudo chmod 600 /etc/webapp/environment", # Secure the environment file
-      # Set proper permissions
+
+      # Secure environment file
+      "sudo chmod 600 /etc/webapp/environment",
       "sudo chmod 755 /opt/webapp",
       "sudo chmod 644 /etc/systemd/system/webapp.service",
+
+      # Create and secure log files
       "sudo touch /var/log/webapp/output.log /var/log/webapp/error.log",
       "sudo chown csye6225:csye6225 /var/log/webapp/output.log /var/log/webapp/error.log",
+
+      # Enable CloudWatch Agent and WebApp service
+      "sudo systemctl enable amazon-cloudwatch-agent",
+      "sudo systemctl start amazon-cloudwatch-agent",
       "sudo systemctl daemon-reload",
       "sudo systemctl enable webapp"
-      # Service will be started by terraform user data after setting DB configuration
     ]
   }
 
   # Share GCP image with target project
-  post-processor "shell-local" {
-    only = ["googlecompute.ubuntu"]
-    inline = [
-      "echo 'Setting up authentication...'",
-      "cat > /tmp/packer-gcp-key.json << 'EOF'",
-      "${local.gcp_credentials}",
-      "EOF",
-      "export GOOGLE_APPLICATION_CREDENTIALS=/tmp/packer-gcp-key.json",
-      "gcloud auth activate-service-account --key-file=/tmp/packer-gcp-key.json",
-      "gcloud config set project ${var.gcp_project_id}",
-      "LATEST_IMAGE=$(gcloud compute images list --project=${var.gcp_project_id} --filter=\"name~'webapp-.*'\" --sort-by=~creationTimestamp --limit=1 --format='get(name)')",
-      "if [ -n \"$LATEST_IMAGE\" ]; then",
-      "  echo \"Sharing image: $LATEST_IMAGE\"",
-      "  gcloud compute images create \"$LATEST_IMAGE\" --source-image=\"$LATEST_IMAGE\" --source-image-project=${var.gcp_project_id} --project=${var.gcp_demo_id}",
-      "else",
-      "  echo \"No webapp image found\"",
-      "  exit 1",
-      "fi",
-      "rm -f /tmp/packer-gcp-key.json"
-    ]
-  }
+  # post-processor "shell-local" {
+  #   only = ["googlecompute.ubuntu"]
+  #   inline = [
+  #     "echo 'Setting up authentication...'",
+  #     "cat > /tmp/packer-gcp-key.json << 'EOF'",
+  #     "${local.gcp_credentials}",
+  #     "EOF",
+  #     "export GOOGLE_APPLICATION_CREDENTIALS=/tmp/packer-gcp-key.json",
+  #     "gcloud auth activate-service-account --key-file=/tmp/packer-gcp-key.json",
+  #     "gcloud config set project ${var.gcp_project_id}",
+  #     "LATEST_IMAGE=$(gcloud compute images list --project=${var.gcp_project_id} --filter=\"name~'webapp-.*'\" --sort-by=~creationTimestamp --limit=1 --format='get(name)')",
+  #     "if [ -n \"$LATEST_IMAGE\" ]; then",
+  #     "  echo \"Sharing image: $LATEST_IMAGE\"",
+  #     "  gcloud compute images create \"$LATEST_IMAGE\" --source-image=\"$LATEST_IMAGE\" --source-image-project=${var.gcp_project_id} --project=${var.gcp_demo_id}",
+  #     "else",
+  #     "  echo \"No webapp image found\"",
+  #     "  exit 1",
+  #     "fi",
+  #     "rm -f /tmp/packer-gcp-key.json"
+  #   ]
+  # }
 }
