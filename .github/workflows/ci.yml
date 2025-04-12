@@ -53,7 +53,8 @@ jobs:
           DB_PORT: ${{ secrets.DB_PORT }}
         run: yarn test
 
-      - name: Configure AWS credentials
+      # Only proceed with deployment steps if PR is merged
+      - name: Configure AWS credentials for DEV account
         if: github.event.pull_request.merged == true
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -93,6 +94,7 @@ jobs:
 
       - name: Build Packer images
         if: github.event.pull_request.merged == true
+        id: build-ami
         run: |
           packer build \
             -var "aws_profile=default" \
@@ -108,3 +110,107 @@ jobs:
             -var "app_port=8080" \
             -var "node_version=${{ env.NODE_VERSION }}" \
             packer.pkr.hcl
+
+          # Extract AMI ID from Packer output
+          AMI_ID=$(aws ec2 describe-images --owners self --filters "Name=name,Values=webapp-*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
+          echo "::set-output name=ami_id::$AMI_ID"
+          echo "Built AMI ID: $AMI_ID"
+
+      # [NEW] Switch to DEMO AWS account credentials
+      - name: Configure AWS credentials for DEMO account
+        if: github.event.pull_request.merged == true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.DEMO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.DEMO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # [NEW] Update Launch Template with new AMI
+      - name: Update Launch Template with new AMI
+        if: github.event.pull_request.merged == true
+        id: update-launch-template
+        run: |
+          # Find the Launch Template
+          LAUNCH_TEMPLATE_ID=$(aws ec2 describe-launch-templates --filters "Name=launch-template-name,Values=csye6225_asg" --query "LaunchTemplates[0].LaunchTemplateId" --output text)
+          if [ -z "$LAUNCH_TEMPLATE_ID" ]; then
+            echo "Error: Launch template 'csye6225_asg' not found"
+            exit 1
+          fi
+
+          echo "Found Launch Template ID: $LAUNCH_TEMPLATE_ID"
+
+          # Get the latest version
+          LATEST_VERSION=$(aws ec2 describe-launch-template-versions --launch-template-id $LAUNCH_TEMPLATE_ID --query "LaunchTemplateVersions[0].VersionNumber" --output text)
+          echo "Current Latest Version: $LATEST_VERSION"
+
+          # Create a new Launch Template version with the new AMI ID
+          NEW_VERSION=$(aws ec2 create-launch-template-version \
+            --launch-template-id $LAUNCH_TEMPLATE_ID \
+            --version-description "Updated by GitHub Actions with AMI ${{ env.AMI_ID }}" \
+            --source-version $LATEST_VERSION \
+            --launch-template-data "{\"ImageId\":\"${{ env.AMI_ID }}\"}" \
+            --query "LaunchTemplateVersion.VersionNumber" \
+            --output text)
+
+          echo "Created new Launch Template version: $NEW_VERSION"
+          echo "LAUNCH_TEMPLATE_ID=$LAUNCH_TEMPLATE_ID" >> $GITHUB_ENV
+          echo "LAUNCH_TEMPLATE_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      # [NEW] Start Instance Refresh for Auto Scaling Group
+      - name: Start Instance Refresh
+        if: github.event.pull_request.merged == true
+        id: start-refresh
+        run: |
+          # Get the ASG name
+          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --query "AutoScalingGroups[?contains(Tags[?Key=='Name'].Value, 'webapp-asg')].AutoScalingGroupName" --output text)
+          if [ -z "$ASG_NAME" ]; then
+            echo "Error: Auto Scaling Group with tag 'Name:webapp-asg' not found"
+            exit 1
+          fi
+
+          echo "Found Auto Scaling Group: $ASG_NAME"
+
+          # Start instance refresh
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name $ASG_NAME \
+            --preferences '{"MinHealthyPercentage": 90, "InstanceWarmup": 300}' \
+            --query "InstanceRefreshId" \
+            --output text)
+
+          echo "Started Instance Refresh with ID: $REFRESH_ID"
+          echo "ASG_NAME=$ASG_NAME" >> $GITHUB_ENV
+          echo "REFRESH_ID=$REFRESH_ID" >> $GITHUB_ENV
+
+      # [NEW] Wait for Instance Refresh to complete
+      - name: Wait for Instance Refresh to Complete
+        if: github.event.pull_request.merged == true
+        run: |
+          echo "Waiting for instance refresh to complete..."
+
+          # Loop until instance refresh is complete or failed
+          while true; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name ${{ env.ASG_NAME }} \
+              --instance-refresh-ids ${{ env.REFRESH_ID }} \
+              --query "InstanceRefreshes[0].Status" \
+              --output text)
+            
+            echo "Instance refresh status: $STATUS"
+            
+            if [ "$STATUS" == "Successful" ]; then
+              echo "Instance refresh completed successfully!"
+              break
+            elif [ "$STATUS" == "Failed" ] || [ "$STATUS" == "Cancelled" ]; then
+              echo "Instance refresh failed or was cancelled."
+              exit 1
+            elif [ "$STATUS" == "Pending" ] || [ "$STATUS" == "InProgress" ]; then
+              echo "Instance refresh is in progress. Waiting..."
+              sleep 60
+            else
+              echo "Unknown status: $STATUS. Waiting..."
+              sleep 60
+            fi
+          done
+
+          echo "Deployment completed successfully!"
