@@ -3,7 +3,7 @@ const fileRoutes = require("./fileRoutes");
 
 const initializeRoutes = async (app) => {
   app.use("/healthz", healthCheckRoutes);
-  app.use("/v2/file", fileRoutes);
+  app.use("/v1/file", fileRoutes);
 };
 
 module.exports = {
